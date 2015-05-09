@@ -4,8 +4,23 @@
     無ければgit initを実行するか聞く
  */
 #include <stdio.h>
+#include <dirent.h>
+#include <termios.h>
+#include <unistd.h>
 const char KitVersion[] = "Kit 0.0.1";
 
+//一文字だけ入力を受け取る
+int getch( ) {
+  struct termios oldt, newt;
+  int ch;
+  tcgetattr( STDIN_FILENO, &oldt );
+  newt = oldt;
+  newt.c_lflag &= ~( ICANON | ECHO );
+  tcsetattr( STDIN_FILENO, TCSANOW, &newt );
+  ch = getchar();
+  tcsetattr( STDIN_FILENO, TCSANOW, &oldt );
+  return ch;
+}
 //文字列を渡すと該当するコマンドナンバーを返す
 //該当するコマンドが無い場合は-1を返す
 int detect_command(char string[]) {
@@ -20,6 +35,10 @@ int detect_command(char string[]) {
 }
 
 int main(int argc, const char * argv[]) {
+  const char GitDir[] = ".git";
+  char init_cmd[256] = "git init";
+  char pname[248];
+  int input_chr;
   int command_id;
   if (argc > 1) {
     command_id = detect_command(argv[1]);
@@ -32,7 +51,21 @@ int main(int argc, const char * argv[]) {
       printf("%s\n", KitVersion);
       break;
     case 1://Run init
-      printf("init\n");
+      if (!opendir(GitDir)) {
+        //この辺の英文おかしくないだろうか
+        //ものすごく不安だ
+        printf("Not a git repository.\n");
+        printf("Do you run command \"git init\"?(y/n)\n");
+        input_chr = getch();
+        if (input_chr == 'y' || input_chr == 'Y') {
+          printf("Input some options.\n");
+          fgets(pname, sizeof(pname), stdin);
+          pname[strlen(pname) - 1] = '\0';
+          system(strcat(init_cmd, pname));
+        }
+        else { return 0; }
+        //ここから先　今書いてます
+      }
       break;
     default:
       printf("unknown command!\n");
