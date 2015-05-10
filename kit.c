@@ -29,7 +29,7 @@ int getch( ) {
 //文字列を渡すと該当するコマンドナンバーを返す
 //該当するコマンドが無い場合は-1を返す
 int detect_command(const char string[]) {
-  const char CommandList[][8] = { "-v", "init", "do" };
+  const char CommandList[][8] = { "-v", "init", "do", "done" };
   const int CommandNum = sizeof CommandList / sizeof CommandList[0];
   int i;
   for (i=0; i < CommandNum; i++) {
@@ -123,10 +123,11 @@ void cmd_do(char opts[]) {
   save_kit_file(num + 1, buffer);
 }
 void cmd_done(int argc, const char *argv[]) {
-  const char CommitCmd[] = "git commit -am";
+  const char CommitCmd[] = "git commit -am ";
   const char br[] = "\n";
+  char buffer[128][128] = { {0} };
   char cmd_str[256];
-  int i, j, pointer;
+  int i, num, pointer;
   FILE *fp;
   //引数で指定のない場合には先頭の予定を実行する
   if (argc > 2){
@@ -134,7 +135,27 @@ void cmd_done(int argc, const char *argv[]) {
   }
   else { pointer = 0; }
   //ファイルを開いて全部読む
+  num = read_kit_file(128, buffer);
+  if (num <= pointer) {
+    printf("Not exist\n");
+    exit(1);
+  }
+  //コマンドを作る
+  strcpy(cmd_str, CommitCmd);
+  strcat(cmd_str, "\"");
+  strcat(cmd_str, buffer[pointer]);
+  i = strlen(cmd_str) - 1;
+  if (cmd_str[i] == '\n') {
+    cmd_str[i] = '"';
+  }
+  else {
+    strcat(cmd_str, "\"");
+  }
   //ファイルを一旦リセットして指定の行以外を全部書き込む
+  buffer[pointer][0] = '\0';
+  save_kit_file(num, buffer);
+  //コマンド実行
+  system(cmd_str);
 }
 
 int main(int argc, const char * argv[]) {
