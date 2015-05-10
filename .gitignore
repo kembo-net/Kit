@@ -2,3 +2,4 @@ a.out
 *.swp
 *.swo
 test.c
+.kitstack
