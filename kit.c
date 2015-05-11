@@ -13,6 +13,7 @@ const char KitVersion[] = "Kit 0.0.2";
 const char GitDir[]     = ".git";
 const char KitFile[]    = ".kitstack";
 const char GitCmd[]    = "git";
+const char br[] = "\n";
 
 //一文字だけ入力を受け取る
 int getch( ) {
@@ -26,10 +27,14 @@ int getch( ) {
   tcsetattr( STDIN_FILENO, TCSANOW, &oldt );
   return ch;
 }
+//最後の文字へのポインタを返す
+char *last_char(char string[]) {
+  return string + (strlen(string) - 1);
+}
 //文字列を渡すと該当するコマンドナンバーを返す
 //該当するコマンドが無い場合は-1を返す
 int detect_command(const char string[]) {
-  const char CommandList[][8] = { "-v", "init", "do", "done" };
+  const char CommandList[][8] = { "-v", "init", "do", "done", "now" };
   const int CommandNum = sizeof CommandList / sizeof CommandList[0];
   int i;
   for (i=0; i < CommandNum; i++) {
@@ -76,7 +81,6 @@ int read_kit_file(int length, char result[][128]) {
 }
 //配列の中身を指定されたindexまでkitファイルに詰め込んで保存する(空行はスキップ)
 void save_kit_file(int index, char inputs[][128]) {
-  const char br[] = "\n";
   int i;
   FILE *fp;
   fp = fopen(KitFile, "w");
@@ -84,7 +88,7 @@ void save_kit_file(int index, char inputs[][128]) {
     for (i=0; i < index; i++) {
       if ((inputs[i][0] != '\0') && (inputs[i][0] != '\n')) {
         fputs(inputs[i], fp);
-        if (inputs[i][strlen(inputs[i]) - 1] != '\n') {
+        if (*last_char(inputs[i]) != '\n') {
           fputs(br, fp);
         }
       }
@@ -124,11 +128,9 @@ void cmd_do(char opts[]) {
 }
 void cmd_done(int argc, const char *argv[]) {
   const char CommitCmd[] = "git commit -am ";
-  const char br[] = "\n";
   char buffer[128][128] = { {0} };
   char cmd_str[256];
   int i, num, pointer;
-  FILE *fp;
   //引数で指定のない場合には先頭の予定を実行する
   if (argc > 2){
     pointer = atoi(argv[2]);
@@ -144,9 +146,8 @@ void cmd_done(int argc, const char *argv[]) {
   strcpy(cmd_str, CommitCmd);
   strcat(cmd_str, "\"");
   strcat(cmd_str, buffer[pointer]);
-  i = strlen(cmd_str) - 1;
-  if (cmd_str[i] == '\n') {
-    cmd_str[i] = '"';
+  if (*last_char(cmd_str) == '\n') {
+    *last_char(cmd_str) = '"';
   }
   else {
     strcat(cmd_str, "\"");
@@ -156,6 +157,23 @@ void cmd_done(int argc, const char *argv[]) {
   save_kit_file(num, buffer);
   //コマンド実行
   system(cmd_str);
+}
+void cmd_now(int argc, const char *argv[]) {
+  char buffer[128];
+  FILE *fp;
+  //ファイルを開いて一行目だけ読んで表示
+  fp = fopen(KitFile, "r");
+  if (fp == NULL) {
+    printf("%s is not found.\n", KitFile);
+    exit(1);
+  }
+  if (fgets(buffer, sizeof(buffer), fp) != NULL) {
+    if (strlen(buffer) > 0) {
+      printf(buffer);
+      if (*last_char(buffer) != '\n') { printf(br); }
+    }
+  }
+  fclose(fp);
 }
 
 int main(int argc, const char * argv[]) {
@@ -186,6 +204,9 @@ int main(int argc, const char * argv[]) {
       break;
     case 3://Run done
       cmd_done(argc, argv);
+      break;
+    case 4://Run now
+      cmd_now(argc, argv);
       break;
     default:
       printf("unknown command!\n");
