@@ -5,12 +5,10 @@ gitへのコミットを予告するコマンド
 ###kit init ...
 Gitリポジトリ内の場合は.kitstackを生成する。
 そうでない場合は任意のオプション付きでgit initを行ってから.kitstackを生成する。
-###kit do (-a)? "..."
+###kit do "..."
 git commitの予定を.kitstackに積む。
-git commitのmオプションは自動で付くが、
-aオプションも付けたい場合は付加することが出来る。
-###kit do after (-a)? "..."
-###kit do (after)? [0-9]+ (-a)? "..."
+###kit do after "..."
+###kit do (after)? [0-9]+ "..."
 末尾、もしくは特定の場所に予定を追加する。
 ###kit done ([0-9]+)?
 .kitstackに最後に積まれた予定をコミットする。
