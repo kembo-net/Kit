@@ -256,6 +256,13 @@ void cmd_list() {
   }
   fclose(fp);
 }
+void cmd_git(int argc, const char *argv[]) {
+  char cmd_str[128], opts[128];
+  strcpy(cmd_str, GitCmd);
+  gen_arg_str(argc, argv, 1, opts);
+  strcat(cmd_str, opts);
+  system(cmd_str);
+}
 
 int main(int argc, const char * argv[]) {
   char str[128];
@@ -288,7 +295,7 @@ int main(int argc, const char * argv[]) {
       cmd_list();
       break;
     default:
-      printf("unknown command!\n");
+      cmd_git(argc, argv);
       break;
   }
   return 0;
