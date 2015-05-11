@@ -9,7 +9,7 @@
 #include <dirent.h>
 #include <termios.h>
 #include <unistd.h>
-const char KitVersion[] = "Kit 0.0.2";
+const char KitVersion[] = "Kit 0.0.5";
 const char GitDir[]     = ".git";
 const char KitFile[]    = ".kitstack";
 const char GitCmd[]    = "git";
@@ -33,14 +33,13 @@ char *last_char(char string[]) {
 }
 //与えられた文字列が整数値だったら0を返す
 int is_num(const char string[]) {
-  int i, result = 0;
+  int i;
+  i = 0;
   while ((string[i] != '\0') && (string[i] != '\n')) {
-    if ((string[i] < '0') || ('9' < string[i])) {
-      result = -1;
-      break;
-    }
+    if ((string[i] < '0') || ('9' < string[i])) { return -1; }
+    i++;
   }
-  return result;
+  return 0;
 }
 //文字列を渡すと該当するコマンドナンバーを返す
 //該当するコマンドが無い場合は-1を返す
@@ -59,14 +58,14 @@ int detect_command(const char string[]) {
 }
 //オプション列からディレクトリ名(ハイフンついてない項目)を探して返す
 void search_no_hyphen(
+    const int argc,
     const char *argv[], 
     const int starting_point,
-    const int ending_point,
     char result[]) {
   int i;
   strcpy(result, "");
-  if (starting_point < ending_point) {
-    for (i = starting_point; i < ending_point; i++) {
+  if (starting_point < argc) {
+    for (i = starting_point; i < argc; i++) {
       if (argv[i][0] != '-' && argv[i][0] != '\0') {
         strcpy(result, argv[i]);
         break;
@@ -109,17 +108,38 @@ void save_kit_file(int index, char inputs[][128]) {
     fclose(fp);
   }
 }
+//引数の一覧を文字列にして詰め込む
+void gen_arg_str(int argc, const char *argv[], int start, char result[]) {
+  int i;
+  strcpy(result, "");
+  if (argc > start) {
+    //コマンド以降のオプションを文字列に格納
+    for (i = start; i < argc; i++) {
+      strcat(result, " ");
+      //ハイフン付のオプションか数字以外はダブルクォーテーションで囲む
+      if ((argv[i][0] == '-') || (is_num(argv[i]) == 0)) {
+        strcat(result, argv[i]);
+      }
+      else {
+        strcat(result, "\"");
+        strcat(result, argv[i]);
+        strcat(result, "\"");
+      }
+    }
+  }
+}
 
-void cmd_init(int argc, const char * argv[], char opts[]){
+void cmd_init(int argc, const char * argv[]){
   const char InitCmd[] = "git init";
   char cmd_str[256], dir_str[128];
   FILE *fp;
   //Gitディレクトリが見つからなかったらgit initする
   if (!opendir(GitDir)) {
     strcpy(cmd_str, InitCmd);
-    strcat(cmd_str, opts);
+    gen_arg_str(argc, argv, 2, dir_str);
+    strcat(cmd_str, dir_str);
     system(cmd_str);
-    search_no_hyphen(argv, 2, argc, dir_str);
+    search_no_hyphen(argc, argv, 2, dir_str);
     if (dir_str[0] == '\0') { strcpy(dir_str, "."); }
     strcat(dir_str, "/");
   }
@@ -130,13 +150,44 @@ void cmd_init(int argc, const char * argv[], char opts[]){
   if (fp == NULL) { fp = fopen(dir_str, "w"); }
   fclose(fp);
 }
-void cmd_do(char opts[]) {
+void cmd_do(int argc, const char *argv[]) {
+  const char AfterCmd[] = "after";
   char buffer[128][128] = { {0} };
-  int num;
-  strcpy(buffer[0], opts);
+  char opt[128];
+  int i, num, point;
   //ファイルを開いて全部読む
-  num = read_kit_file(127, buffer + 1);
-  //ファイルを一旦リセットして先頭に新しいコメントを追加して全部書き込む
+  num = read_kit_file(127, buffer);
+  //afterコマンド等の検証
+  strcpy(opt, "\"");
+  if (argc == 3) {
+    point = 0;
+    strcat(opt, argv[2]);
+  }
+  else if (argc == 4) {
+    if (is_num(argv[2]) == 0) { point = atoi(argv[2]); }
+    else if (strcmp(argv[2], AfterCmd) == 0) { point = num; }
+    else {
+      printf("unknown command.\n");
+      exit(1);
+    }
+    strcat(opt, argv[3]);
+  }
+  else if ( (argc == 5) && (is_num(argv[3]) == 0)
+      && (strcmp(argv[2], AfterCmd) == 0) ) {
+    point = atoi(argv[3]);
+    strcat(opt, argv[4]);
+  }
+  else {
+    printf("unknown command.\n");
+    exit(1);
+  }
+  strcat(opt, "\"");
+  //指定行に挿入
+  for (i = num; i > point; i--) {
+    strcpy(buffer[i], buffer[i - 1]);
+  }
+  strcpy(buffer[point], opt);
+  //ファイルを一旦リセットして全部書き込む
   save_kit_file(num + 1, buffer);
 }
 void cmd_done(int argc, const char *argv[]) {
@@ -145,10 +196,14 @@ void cmd_done(int argc, const char *argv[]) {
   char cmd_str[256];
   int i, num, pointer;
   //引数で指定のない場合には先頭の予定を実行する
-  if (argc > 2){
+  if (argc == 2){ pointer = 0; }
+  else if ( (argc == 3) && (is_num(argv[2]) == 0) ) {
     pointer = atoi(argv[2]);
   }
-  else { pointer = 0; }
+  else {
+    printf("unknown command.\n");
+    exit(1);
+  }
   //ファイルを開いて全部読む
   num = read_kit_file(128, buffer);
   if (num <= pointer) {
@@ -203,26 +258,12 @@ void cmd_list() {
 }
 
 int main(int argc, const char * argv[]) {
-  char opts[253] = "";
+  char str[128];
   int i, command_id;
   //コマンド判定
   //コマンドが何も付いていない場合はバージョン表示
   if (argc > 1) {
     command_id = detect_command(argv[1]);
-    if (argc > 2) {
-      //コマンド以降のオプションを文字列に格納
-      for (i = 2; i < argc; i++) {
-        strcat(opts, " ");
-        if ((argv[i][0] == '-') || (is_num(argv[i]) == 0)) {
-          strcat(opts, argv[i]);
-        }
-        else {
-          strcat(opts, "\"");
-          strcat(opts, argv[i]);
-          strcat(opts, "\"");
-        }
-      }
-    }
   }
   else {
     command_id = 0;
@@ -232,11 +273,10 @@ int main(int argc, const char * argv[]) {
       printf("%s\n", KitVersion);
       break;
     case 1://Run init
-      cmd_init(argc, argv, opts);
+      cmd_init(argc, argv);
       break;
     case 2://Run do
-      search_no_hyphen(argv, 2, argc, opts);
-      cmd_do(opts);
+      cmd_do(argc, argv);
       break;
     case 3://Run done
       cmd_done(argc, argv);
