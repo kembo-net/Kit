@@ -31,10 +31,24 @@ int getch( ) {
 char *last_char(char string[]) {
   return string + (strlen(string) - 1);
 }
+//与えられた文字列が整数値だったら0を返す
+int is_num(const char string[]) {
+  int i, result = 0;
+  while ((string[i] != '\0') && (string[i] != '\n')) {
+    if ((string[i] < '0') || ('9' < string[i])) {
+      result = -1;
+      break;
+    }
+  }
+  return result;
+}
 //文字列を渡すと該当するコマンドナンバーを返す
 //該当するコマンドが無い場合は-1を返す
 int detect_command(const char string[]) {
-  const char CommandList[][8] = { "-v", "init", "do", "done", "now" };
+  const char CommandList[][8] = {
+    "-v", "init", "do", "done",
+    "now", "list"
+  };
   const int CommandNum = sizeof CommandList / sizeof CommandList[0];
   int i;
   for (i=0; i < CommandNum; i++) {
@@ -74,7 +88,6 @@ int read_kit_file(int length, char result[][128]) {
     if (fgets(result[i], sizeof(result[i]), fp) == NULL) {
       break;
     }
-    printf("%s", result[i]);
   }
   fclose(fp);
   return i;
@@ -144,13 +157,9 @@ void cmd_done(int argc, const char *argv[]) {
   }
   //コマンドを作る
   strcpy(cmd_str, CommitCmd);
-  strcat(cmd_str, "\"");
   strcat(cmd_str, buffer[pointer]);
   if (*last_char(cmd_str) == '\n') {
-    *last_char(cmd_str) = '"';
-  }
-  else {
-    strcat(cmd_str, "\"");
+    *last_char(cmd_str) = '\0';
   }
   //ファイルを一旦リセットして指定の行以外を全部書き込む
   buffer[pointer][0] = '\0';
@@ -175,16 +184,43 @@ void cmd_now(int argc, const char *argv[]) {
   }
   fclose(fp);
 }
+void cmd_list() {
+  char buffer[128];
+  int i;
+  FILE *fp;
+  fp = fopen(KitFile, "r");
+  if (fp == NULL) {
+    printf("%s is not found.\n", KitFile);
+    exit(1);
+  }
+  i = 0;
+  while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+    printf("%d %s", i, buffer);
+    if (*last_char(buffer) != '\n') { printf(br); }
+    i++;
+  }
+  fclose(fp);
+}
 
 int main(int argc, const char * argv[]) {
   char opts[253] = "";
   int i, command_id;
+  //コマンド判定
+  //コマンドが何も付いていない場合はバージョン表示
   if (argc > 1) {
     command_id = detect_command(argv[1]);
     if (argc > 2) {
+      //コマンド以降のオプションを文字列に格納
       for (i = 2; i < argc; i++) {
         strcat(opts, " ");
-        strcat(opts, argv[i]);
+        if ((argv[i][0] == '-') || (is_num(argv[i]) == 0)) {
+          strcat(opts, argv[i]);
+        }
+        else {
+          strcat(opts, "\"");
+          strcat(opts, argv[i]);
+          strcat(opts, "\"");
+        }
       }
     }
   }
@@ -207,6 +243,9 @@ int main(int argc, const char * argv[]) {
       break;
     case 4://Run now
       cmd_now(argc, argv);
+      break;
+    case 5://Run list
+      cmd_list();
       break;
     default:
       printf("unknown command!\n");
