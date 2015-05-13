@@ -158,7 +158,6 @@ void cmd_do(int argc, const char *argv[]) {
   //ファイルを開いて全部読む
   num = read_kit_file(127, buffer);
   //afterコマンド等の検証
-  strcpy(opt, "\"");
   if (argc >= 4) {
     if (strcmp(argv[2], AfterCmd) == 0) {
       if ((argc >= 5) && (is_num(argv[3]) == 0)) {
@@ -291,44 +290,28 @@ void cmd_remove(int argc, const char *argv[]) {
   save_kit_file(num, buffer);
 }
 void cmd_edit(int argc, const char *argv[]) {
-  const char AfterCmd[] = "after";
   char buffer[128][128] = { {0} };
   char opt[128];
   int i, num, point;
   //ファイルを開いて全部読む
   num = read_kit_file(127, buffer);
   //番号検出
-  strcpy(opt, "\"");
-  if (argc == 3) {
+  if ((argc >= 4) && (is_num(argv[2]) == 0)) {
+    point = atoi(argv[2]);
+    gen_arg_str(argc, argv, 3, opt);
+  }
+  else if (argc >= 3) {
     point = 0;
-    strcat(opt, argv[2]);
-  }
-  else if (argc == 4) {
-    if (is_num(argv[2]) == 0) { point = atoi(argv[2]); }
-    else if (strcmp(argv[2], AfterCmd) == 0) { point = num; }
-    else {
-      printf("unknown command.\n");
-      exit(1);
-    }
-    strcat(opt, argv[3]);
-  }
-  else if ( (argc == 5) && (is_num(argv[3]) == 0)
-      && (strcmp(argv[2], AfterCmd) == 0) ) {
-    point = atoi(argv[3]);
-    strcat(opt, argv[4]);
+    gen_arg_str(argc, argv, 2, opt);
   }
   else {
-    printf("unknown command.\n");
+    printf("No options.\n");
     exit(1);
   }
-  strcat(opt, "\"");
-  //指定行に挿入
-  for (i = num; i > point; i--) {
-    strcpy(buffer[i], buffer[i - 1]);
-  }
+  //指定行を編集
   strcpy(buffer[point], opt);
   //ファイルを一旦リセットして全部書き込む
-  save_kit_file(num + 1, buffer);
+  save_kit_file(num, buffer);
 }
 
 int main(int argc, const char * argv[]) {
