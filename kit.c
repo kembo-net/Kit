@@ -46,7 +46,7 @@ int is_num(const char string[]) {
 int detect_command(const char string[]) {
   const char CommandList[][8] = {
     "-v", "init", "do", "done",
-    "now", "list"
+    "now", "list", "remove"
   };
   const int CommandNum = sizeof CommandList / sizeof CommandList[0];
   int i;
@@ -263,6 +263,28 @@ void cmd_git(int argc, const char *argv[]) {
   strcat(cmd_str, opts);
   system(cmd_str);
 }
+void cmd_remove(int argc, const char *argv[]) {
+  char buffer[128][128] = { {0} };
+  int i, num, pointer;
+  //引数で指定のない場合には先頭の予定を削除する
+  if (argc == 2){ pointer = 0; }
+  else if ( (argc == 3) && (is_num(argv[2]) == 0) ) {
+    pointer = atoi(argv[2]);
+  }
+  else {
+    printf("unknown command.\n");
+    exit(1);
+  }
+  //ファイルを開いて全部読む
+  num = read_kit_file(128, buffer);
+  if (num <= pointer) {
+    printf("Not exist\n");
+    exit(1);
+  }
+  //ファイルを一旦リセットして指定の行以外を全部書き込む
+  buffer[pointer][0] = '\0';
+  save_kit_file(num, buffer);
+}
 
 int main(int argc, const char * argv[]) {
   char str[128];
@@ -293,6 +315,9 @@ int main(int argc, const char * argv[]) {
       break;
     case 5://Run list
       cmd_list();
+      break;
+    case 6://Run remove
+      cmd_remove(argc, argv);
       break;
     default:
       cmd_git(argc, argv);
