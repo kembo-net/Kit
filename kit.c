@@ -128,6 +128,39 @@ void gen_arg_str(int argc, const char *argv[], int start, char result[]) {
     }
   }
 }
+//ダブルクォーテーションをエスケープする
+void escape_dq(char str[]) {
+  int i, cnt, len;
+  len = strlen(str);
+  cnt = 0;
+  for (i = 0; i < len; i++) {
+    if (str[i] == '"') { cnt++; }
+  }
+  if (cnt > 0) {
+    for (i = len; i >= 0; i--) {
+      str[i + cnt] = str[i];
+      if (str[i] == '"') {
+        cnt--;
+        str[i + cnt] = '\\';
+        if (cnt == 0) { break; }
+      }
+    }
+  }
+}
+//kitの更新記録をコミットする
+void commit_kit(const char message[]) {
+  const char AddCmd[] = "git add ";
+  const char CommitCmd[] = "git commit -m ";
+  char cmd_str[128];
+  strcpy(cmd_str, AddCmd);
+  strcat(cmd_str, KitFile);
+  system(cmd_str);
+  strcpy(cmd_str, CommitCmd);
+  strcat(cmd_str, "\"");
+  strcat(cmd_str, message);
+  strcat(cmd_str, "\"");
+  system(cmd_str);
+}
 
 void cmd_init(int argc, const char * argv[]){
   const char InitCmd[] = "git init";
@@ -154,6 +187,7 @@ void cmd_do(int argc, const char *argv[]) {
   const char AfterCmd[] = "after";
   char buffer[128][128] = { {0} };
   char opt[128];
+  char mes[128] = "[kit]add plan ";
   int i, num, point;
   //ファイルを開いて全部読む
   num = read_kit_file(127, buffer);
@@ -193,6 +227,10 @@ void cmd_do(int argc, const char *argv[]) {
   strcpy(buffer[point], opt);
   //ファイルを一旦リセットして全部書き込む
   save_kit_file(num + 1, buffer);
+  //kitファイルの変更をコミット
+  escape_dq(opt);
+  strcat(mes, opt);
+  commit_kit(mes);
 }
 void cmd_done(int argc, const char *argv[]) {
   const char CommitCmd[] = "git commit -am ";
@@ -260,15 +298,9 @@ void cmd_list() {
   }
   fclose(fp);
 }
-void cmd_git(int argc, const char *argv[]) {
-  char cmd_str[128], opts[128];
-  strcpy(cmd_str, GitCmd);
-  gen_arg_str(argc, argv, 1, opts);
-  strcat(cmd_str, opts);
-  system(cmd_str);
-}
 void cmd_remove(int argc, const char *argv[]) {
   char buffer[128][128] = { {0} };
+  char mes[128] = "[kit]remove plan ";
   int i, num, pointer;
   //引数で指定のない場合には先頭の予定を削除する
   if (argc == 2){ pointer = 0; }
@@ -285,12 +317,18 @@ void cmd_remove(int argc, const char *argv[]) {
     printf("Not exist\n");
     exit(1);
   }
+  //削除する予定の内容をコミットメッセージ用に保存
+  escape_dq(buffer[pointer]);
+  strcat(mes, buffer[pointer]);
   //ファイルを一旦リセットして指定の行以外を全部書き込む
   buffer[pointer][0] = '\0';
   save_kit_file(num, buffer);
+  //kitファイルの変更をコミット
+  commit_kit(mes);
 }
 void cmd_edit(int argc, const char *argv[]) {
   char buffer[128][128] = { {0} };
+  char mes[128] = "[kit]edit plan to ";
   char opt[128];
   int i, num, point;
   //ファイルを開いて全部読む
@@ -312,6 +350,18 @@ void cmd_edit(int argc, const char *argv[]) {
   strcpy(buffer[point], opt);
   //ファイルを一旦リセットして全部書き込む
   save_kit_file(num, buffer);
+  //kitファイルの変更をコミット
+  escape_dq(opt);
+  strcat(mes, opt);
+  commit_kit(mes);
+}
+//kitに無いコマンドはgitにそのまま回す
+void cmd_git(int argc, const char *argv[]) {
+  char cmd_str[128], opts[128];
+  strcpy(cmd_str, GitCmd);
+  gen_arg_str(argc, argv, 1, opts);
+  strcat(cmd_str, opts);
+  system(cmd_str);
 }
 
 int main(int argc, const char * argv[]) {
