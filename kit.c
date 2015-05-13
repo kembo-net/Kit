@@ -9,7 +9,7 @@
 #include <dirent.h>
 #include <termios.h>
 #include <unistd.h>
-const char KitVersion[] = "Kit 0.0.5";
+const char KitVersion[] = "Kit 0.0.6";//<-気がついた時に更新してるから超適当
 const char GitDir[]     = ".git";
 const char KitFile[]    = ".kitstack";
 const char GitCmd[]    = "git";
@@ -46,7 +46,7 @@ int is_num(const char string[]) {
 int detect_command(const char string[]) {
   const char CommandList[][8] = {
     "-v", "init", "do", "done",
-    "now", "list", "remove"
+    "now", "list", "remove", "edit"
   };
   const int CommandNum = sizeof CommandList / sizeof CommandList[0];
   int i;
@@ -159,29 +159,34 @@ void cmd_do(int argc, const char *argv[]) {
   num = read_kit_file(127, buffer);
   //afterコマンド等の検証
   strcpy(opt, "\"");
-  if (argc == 3) {
-    point = 0;
-    strcat(opt, argv[2]);
-  }
-  else if (argc == 4) {
-    if (is_num(argv[2]) == 0) { point = atoi(argv[2]); }
-    else if (strcmp(argv[2], AfterCmd) == 0) { point = num; }
-    else {
-      printf("unknown command.\n");
-      exit(1);
+  if (argc >= 4) {
+    if (strcmp(argv[2], AfterCmd) == 0) {
+      if ((argc >= 5) && (is_num(argv[3]) == 0)) {
+        point = atoi(argv[3]);
+        gen_arg_str(argc, argv, 4, opt);
+      }
+      else {
+        point = num;
+        gen_arg_str(argc, argv, 3, opt);
+      }
     }
-    strcat(opt, argv[3]);
+    else if (is_num(argv[2]) == 0) {
+      point = atoi(argv[2]);
+      gen_arg_str(argc, argv, 3, opt);
+    }
+    else {
+      point = 0;
+      gen_arg_str(argc, argv, 2, opt);
+    }
   }
-  else if ( (argc == 5) && (is_num(argv[3]) == 0)
-      && (strcmp(argv[2], AfterCmd) == 0) ) {
-    point = atoi(argv[3]);
-    strcat(opt, argv[4]);
+  else if (argc == 3) {
+    point = 0;
+    gen_arg_str(argc, argv, 2, opt);
   }
   else {
-    printf("unknown command.\n");
+    printf("No options.\n");
     exit(1);
   }
-  strcat(opt, "\"");
   //指定行に挿入
   for (i = num; i > point; i--) {
     strcpy(buffer[i], buffer[i - 1]);
@@ -285,6 +290,46 @@ void cmd_remove(int argc, const char *argv[]) {
   buffer[pointer][0] = '\0';
   save_kit_file(num, buffer);
 }
+void cmd_edit(int argc, const char *argv[]) {
+  const char AfterCmd[] = "after";
+  char buffer[128][128] = { {0} };
+  char opt[128];
+  int i, num, point;
+  //ファイルを開いて全部読む
+  num = read_kit_file(127, buffer);
+  //番号検出
+  strcpy(opt, "\"");
+  if (argc == 3) {
+    point = 0;
+    strcat(opt, argv[2]);
+  }
+  else if (argc == 4) {
+    if (is_num(argv[2]) == 0) { point = atoi(argv[2]); }
+    else if (strcmp(argv[2], AfterCmd) == 0) { point = num; }
+    else {
+      printf("unknown command.\n");
+      exit(1);
+    }
+    strcat(opt, argv[3]);
+  }
+  else if ( (argc == 5) && (is_num(argv[3]) == 0)
+      && (strcmp(argv[2], AfterCmd) == 0) ) {
+    point = atoi(argv[3]);
+    strcat(opt, argv[4]);
+  }
+  else {
+    printf("unknown command.\n");
+    exit(1);
+  }
+  strcat(opt, "\"");
+  //指定行に挿入
+  for (i = num; i > point; i--) {
+    strcpy(buffer[i], buffer[i - 1]);
+  }
+  strcpy(buffer[point], opt);
+  //ファイルを一旦リセットして全部書き込む
+  save_kit_file(num + 1, buffer);
+}
 
 int main(int argc, const char * argv[]) {
   char str[128];
@@ -318,6 +363,9 @@ int main(int argc, const char * argv[]) {
       break;
     case 6://Run remove
       cmd_remove(argc, argv);
+      break;
+    case 7://Run edit
+      cmd_edit(argc, argv);
       break;
     default:
       cmd_git(argc, argv);
