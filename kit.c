@@ -9,10 +9,13 @@
 #include <dirent.h>
 #include <termios.h>
 #include <unistd.h>
-const char KitVersion[] = "Kit 0.0.6";//<-気がついた時に更新してるから超適当
+const char KitVersion[] = "Kit x.x.xxx";
 const char GitDir[]     = ".git";
 const char KitFile[]    = ".kitstack";
-const char GitCmd[]    = "git";
+const char GitCmd[]    = "git ";
+const char AddCmd[] = "git add ";
+const char InitCmd[] = "git init ";
+const char CommitCmd[] = "git commit -m ";
 const char br[] = "\n";
 
 //一文字だけ入力を受け取る
@@ -59,7 +62,7 @@ int detect_command(const char string[]) {
 //オプション列からディレクトリ名(ハイフンついてない項目)を探して返す
 void search_no_hyphen(
     const int argc,
-    const char *argv[], 
+    char * const argv[], 
     const int starting_point,
     char result[]) {
   int i;
@@ -109,7 +112,7 @@ void save_kit_file(int index, char inputs[][128]) {
   }
 }
 //引数の一覧を文字列にして詰め込む
-void gen_arg_str(int argc, const char *argv[], int start, char result[]) {
+void gen_arg_str(int argc, char * const argv[], int start, char result[]) {
   int i;
   strcpy(result, "");
   if (argc > start) {
@@ -149,8 +152,6 @@ void escape_dq(char str[]) {
 }
 //kitの更新記録をコミットする
 void commit_kit(const char message[]) {
-  const char AddCmd[] = "git add ";
-  const char CommitCmd[] = "git commit -m ";
   char cmd_str[128];
   strcpy(cmd_str, AddCmd);
   strcat(cmd_str, KitFile);
@@ -162,8 +163,7 @@ void commit_kit(const char message[]) {
   system(cmd_str);
 }
 
-void cmd_init(int argc, const char * argv[]){
-  const char InitCmd[] = "git init";
+void cmd_init(int argc, char * const argv[]){
   char cmd_str[256], dir_str[128];
   FILE *fp;
   //Gitディレクトリが見つからなかったらgit initする
@@ -183,68 +183,70 @@ void cmd_init(int argc, const char * argv[]){
   if (fp == NULL) { fp = fopen(dir_str, "w"); }
   fclose(fp);
 }
-void cmd_do(int argc, const char *argv[]) {
+void cmd_do(int argc, char * const argv[]) {
   const char AfterCmd[] = "after";
   char buffer[128][128] = { {0} };
   char opt[128];
   char mes[128] = "[kit]add plan ";
-  int i, num, point;
+  int i, num, pointer, n_opt = 0;
+  //-nオプションの検出
+  if (getopt(argc, argv, "n") != -1) {
+    n_opt = 1;
+  }
   //ファイルを開いて全部読む
   num = read_kit_file(127, buffer);
-  //afterコマンド等の検証
-  if (argc >= 4) {
-    if (strcmp(argv[2], AfterCmd) == 0) {
-      if ((argc >= 5) && (is_num(argv[3]) == 0)) {
-        point = atoi(argv[3]);
-        gen_arg_str(argc, argv, 4, opt);
-      }
-      else {
-        point = num;
-        gen_arg_str(argc, argv, 3, opt);
-      }
+  //オプションの検証
+  pointer = 0;
+  while (optind < argc) {
+    if (strcmp(argv[optind], AfterCmd) == 0) {
+      pointer = num;
     }
-    else if (is_num(argv[2]) == 0) {
-      point = atoi(argv[2]);
-      gen_arg_str(argc, argv, 3, opt);
+    else if (is_num(argv[optind]) == 0) {
+      pointer = atoi(argv[optind]);
+      optind++;
+      break;
     }
-    else {
-      point = 0;
-      gen_arg_str(argc, argv, 2, opt);
-    }
+    else { break; }
+    optind++;
   }
-  else if (argc == 3) {
-    point = 0;
-    gen_arg_str(argc, argv, 2, opt);
-  }
-  else {
-    printf("No options.\n");
-    exit(1);
-  }
+  gen_arg_str(argc, argv, optind, opt);
   //指定行に挿入
-  for (i = num; i > point; i--) {
+  for (i = num; i > pointer; i--) {
     strcpy(buffer[i], buffer[i - 1]);
   }
-  strcpy(buffer[point], opt);
+  strcpy(buffer[pointer], opt);
   //ファイルを一旦リセットして全部書き込む
   save_kit_file(num + 1, buffer);
   //kitファイルの変更をコミット
-  escape_dq(opt);
-  strcat(mes, opt);
-  commit_kit(mes);
+  if (n_opt == 0) {
+    escape_dq(opt);
+    strcat(mes, opt);
+    commit_kit(mes);
+  }
 }
-void cmd_done(int argc, const char *argv[]) {
-  const char CommitCmd[] = "git commit -am ";
+void cmd_done(int argc, char * const argv[]) {
   char buffer[128][128] = { {0} };
   char cmd_str[256];
   int i, num, pointer;
   //引数で指定のない場合には先頭の予定を実行する
-  if (argc == 2){ pointer = 0; }
-  else if ( (argc == 3) && (is_num(argv[2]) == 0) ) {
-    pointer = atoi(argv[2]);
+  if (is_num(argv[optind]) == 0) {
+    pointer = atoi(argv[optind]);
+    optind++;
+  }
+  else { pointer = 0; }
+  //git addする
+  if (optind < argc) {
+    do {
+      strcpy(cmd_str, AddCmd);
+      strcat(cmd_str, argv[optind]);
+      system(cmd_str);
+      optind++;
+    } while(optind < argc);
   }
   else {
-    printf("unknown command.\n");
-    exit(1);
+    strcpy(cmd_str, AddCmd);
+    strcat(cmd_str, "-A");
+    system(cmd_str);
   }
   //ファイルを開いて全部読む
   num = read_kit_file(128, buffer);
@@ -264,7 +266,7 @@ void cmd_done(int argc, const char *argv[]) {
   //コマンド実行
   system(cmd_str);
 }
-void cmd_now(int argc, const char *argv[]) {
+void cmd_now(int argc, char * const argv[]) {
   char buffer[128];
   FILE *fp;
   //ファイルを開いて一行目だけ読んで表示
@@ -298,18 +300,21 @@ void cmd_list() {
   }
   fclose(fp);
 }
-void cmd_remove(int argc, const char *argv[]) {
+void cmd_remove(int argc, char * const argv[]) {
   char buffer[128][128] = { {0} };
   char mes[128] = "[kit]remove plan ";
-  int i, num, pointer;
+  int i, num, pointer, n_opt = 0;
+  //-nオプションの検出
+  if (getopt(argc, argv, "n") != -1) {
+    n_opt = 1;
+  }
   //引数で指定のない場合には先頭の予定を削除する
-  if (argc == 2){ pointer = 0; }
-  else if ( (argc == 3) && (is_num(argv[2]) == 0) ) {
+  if ((optind < argc) && (atoi(argv[optind]) == 0)) {
     pointer = atoi(argv[2]);
+    optind++;
   }
   else {
-    printf("unknown command.\n");
-    exit(1);
+    pointer = 0;
   }
   //ファイルを開いて全部読む
   num = read_kit_file(128, buffer);
@@ -318,45 +323,49 @@ void cmd_remove(int argc, const char *argv[]) {
     exit(1);
   }
   //削除する予定の内容をコミットメッセージ用に保存
-  escape_dq(buffer[pointer]);
-  strcat(mes, buffer[pointer]);
+  if (n_opt == 0) {
+    escape_dq(buffer[pointer]);
+    strcat(mes, buffer[pointer]);
+  }
   //ファイルを一旦リセットして指定の行以外を全部書き込む
   buffer[pointer][0] = '\0';
   save_kit_file(num, buffer);
   //kitファイルの変更をコミット
-  commit_kit(mes);
+  if (n_opt == 0) { commit_kit(mes); }
 }
-void cmd_edit(int argc, const char *argv[]) {
+void cmd_edit(int argc, char * const argv[]) {
   char buffer[128][128] = { {0} };
   char mes[128] = "[kit]edit plan to ";
   char opt[128];
-  int i, num, point;
+  int i, num, pointer, n_opt = 0;
+  //-nオプションの検出
+  if (getopt(argc, argv, "n") != -1) {
+    n_opt = 1;
+  }
   //ファイルを開いて全部読む
   num = read_kit_file(127, buffer);
   //番号検出
-  if ((argc >= 4) && (is_num(argv[2]) == 0)) {
-    point = atoi(argv[2]);
-    gen_arg_str(argc, argv, 3, opt);
-  }
-  else if (argc >= 3) {
-    point = 0;
-    gen_arg_str(argc, argv, 2, opt);
+  if ((optind < argc) && (is_num(argv[optind]) ==0)) {
+    pointer = atoi(argv[optind]);
+    optind++;
   }
   else {
-    printf("No options.\n");
-    exit(1);
+    pointer = 0;
   }
   //指定行を編集
-  strcpy(buffer[point], opt);
+  gen_arg_str(argc, argv, optind, opt);
+  strcpy(buffer[pointer], opt);
   //ファイルを一旦リセットして全部書き込む
   save_kit_file(num, buffer);
   //kitファイルの変更をコミット
-  escape_dq(opt);
-  strcat(mes, opt);
-  commit_kit(mes);
+  if (n_opt == 0) {
+    escape_dq(opt);
+    strcat(mes, opt);
+    commit_kit(mes);
+  }
 }
 //kitに無いコマンドはgitにそのまま回す
-void cmd_git(int argc, const char *argv[]) {
+void cmd_git(int argc, char * const argv[]) {
   char cmd_str[128], opts[128];
   strcpy(cmd_str, GitCmd);
   gen_arg_str(argc, argv, 1, opts);
@@ -364,7 +373,7 @@ void cmd_git(int argc, const char *argv[]) {
   system(cmd_str);
 }
 
-int main(int argc, const char * argv[]) {
+int main(int argc, char * const argv[]) {
   char str[128];
   int i, command_id;
   //コマンド判定
@@ -375,6 +384,7 @@ int main(int argc, const char * argv[]) {
   else {
     command_id = 0;
   }
+  optind++;
   switch(command_id) {
     case 0://Put version
       printf("%s\n", KitVersion);
