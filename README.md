@@ -1,6 +1,9 @@
 # Kit
 gitへのコミットを予告するコマンド
 
+##インストール
+gcc kit.c -o ~/bin/kit
+
 ##機能(予定)
 ###kit init ...
 Gitリポジトリ内の場合は.kitstackを生成する。
