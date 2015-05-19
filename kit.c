@@ -9,7 +9,7 @@
 #include <dirent.h>
 #include <termios.h>
 #include <unistd.h>
-const char KitVersion[] = "Kit 0.9 beta";
+const char KitVersion[] = "Kit 0.9.1 beta";
 const char GitDir[]     = ".git";
 const char KitFile[]    = ".kitstack";
 const char GitCmd[]    = "git ";
@@ -229,7 +229,7 @@ void cmd_done(int argc, char * const argv[]) {
   char cmd_str[256];
   int i, num, pointer;
   //引数で指定のない場合には先頭の予定を実行する
-  if (is_num(argv[optind]) == 0) {
+  if ((optind < argc) && (is_num(argv[optind]) == 0)) {
     pointer = atoi(argv[optind]);
     optind++;
   }
