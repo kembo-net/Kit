@@ -96,6 +96,7 @@ int read_kit_file(int length, char result[][128]) {
 }
 //配列の中身を指定されたindexまでkitファイルに詰め込んで保存する(空行はスキップ)
 void save_kit_file(int index, char inputs[][128]) {
+  char cmd_str[128];
   int i;
   FILE *fp;
   fp = fopen(KitFile, "w");
@@ -110,6 +111,13 @@ void save_kit_file(int index, char inputs[][128]) {
     }
     fclose(fp);
   }
+  else { 
+    printf("kit file open error.\n");
+    exit(1);
+  }
+  strcpy(cmd_str, AddCmd);
+  strcat(cmd_str, KitFile);
+  system(cmd_str);
 }
 //引数の一覧を文字列にして詰め込む
 void gen_arg_str(int argc, char * const argv[], int start, char result[]) {
