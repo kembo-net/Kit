@@ -9,7 +9,7 @@
 #include <dirent.h>
 #include <termios.h>
 #include <unistd.h>
-const char KitVersion[] = "Kit 0.11 beta";
+const char KitVersion[] = "Kit 0.11.1 beta";
 const char GitDir[]     = ".git";
 const char KitFile[]    = ".kitstack";
 const char GitCmd[]    = "git ";
@@ -200,10 +200,10 @@ void cmd_do(int argc, char * const argv[]) {
   char buffer[128][128] = { {0} };
   char opts[128][128];
   char mes[128];
-  int i, num, pointer, n_opt = 1, many_flg = 0, opts_len = 1;
+  int i, num, pointer, n_opt = 0, many_flg = 0, opts_len = 1;
   //-nオプションの検出
   if (getopt(argc, argv, "n") != -1) {
-    n_opt = 0;
+    n_opt = 1;
   }
   //ファイルを開いて全部読む
   num = read_kit_file(127, buffer);
@@ -260,7 +260,7 @@ void cmd_do(int argc, char * const argv[]) {
   //ファイルを一旦リセットして全部書き込む
   save_kit_file(num + opts_len, buffer);
   //kitファイルの変更をコミット
-  if (n_opt != 0) {
+  if (n_opt == 0) {
     if (opts_len == 1) {
       strcpy(mes, BaseMes);
       escape_dq(opts[0]);
