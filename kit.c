@@ -9,7 +9,7 @@
 #include <dirent.h>
 #include <termios.h>
 #include <unistd.h>
-const char KitVersion[] = "Kit 0.9.1 beta";
+const char KitVersion[] = "Kit 0.9.2 beta";
 const char GitDir[]     = ".git";
 const char KitFile[]    = ".kitstack";
 const char GitCmd[]    = "git ";
@@ -193,13 +193,17 @@ void cmd_init(int argc, char * const argv[]){
 }
 void cmd_do(int argc, char * const argv[]) {
   const char AfterCmd[] = "after";
+  const char ManyCmd[] = "many";
+  const char EndMany[] = "EOF";
+  const char BaseMes[] = "[kit]add plan ";
+  const char ManyMes[] = "[kit]add many plans";
   char buffer[128][128] = { {0} };
-  char opt[128];
-  char mes[128] = "[kit]add plan ";
-  int i, num, pointer, n_opt = 0;
+  char opts[128][128];
+  char mes[128];
+  int i, num, pointer, n_opt = 1, many_flg = 0, opts_len = 1;
   //-nオプションの検出
   if (getopt(argc, argv, "n") != -1) {
-    n_opt = 1;
+    n_opt = 0;
   }
   //ファイルを開いて全部読む
   num = read_kit_file(127, buffer);
@@ -207,28 +211,64 @@ void cmd_do(int argc, char * const argv[]) {
   pointer = 0;
   while (optind < argc) {
     if (strcmp(argv[optind], AfterCmd) == 0) {
-      pointer = num;
+      if (pointer == 0) {
+        pointer = num;
+      }
+    }
+    else if (strcmp(argv[optind], ManyCmd) == 0) {
+      many_flg = 1;
     }
     else if (is_num(argv[optind]) == 0) {
       pointer = atoi(argv[optind]);
-      optind++;
-      break;
     }
     else { break; }
     optind++;
   }
-  gen_arg_str(argc, argv, optind, opt);
-  //指定行に挿入
-  for (i = num; i > pointer; i--) {
-    strcpy(buffer[i], buffer[i - 1]);
+  if (many_flg) {
+    printf("Input commit messages and press Enter. Finally input \"EOF\".\n");
+    opts_len = 0;
+    while (1) {
+      printf(">");
+      scanf("%s", mes);
+      if (strlen(mes) > 0) {
+        if (strcmp(mes, EndMany) == 0) {
+          break;
+        }
+        else {
+          if ((mes[0] != '"') || (mes[strlen(mes) - 1] != '"')) {
+            strcpy(opts[opts_len], "\"");
+            strcat(opts[opts_len], mes);
+            strcat(opts[opts_len], "\"");
+          }
+          else {
+            strcpy(opts[opts_len], mes);
+          }
+          opts_len++;
+        }
+      }
+    }
+    if (opts_len == 0) { exit(1); }
   }
-  strcpy(buffer[pointer], opt);
+  else { gen_arg_str(argc, argv, optind, opts[0]); }
+  //指定行に挿入
+  for (i = num + opts_len - 1; i > pointer; i--) {
+    strcpy(buffer[i], buffer[i - opts_len]);
+  }
+  for (i = 0; i < opts_len; i++) {
+    strcpy(buffer[i + pointer], opts[i]);
+  }
   //ファイルを一旦リセットして全部書き込む
-  save_kit_file(num + 1, buffer);
+  save_kit_file(num + opts_len, buffer);
   //kitファイルの変更をコミット
-  if (n_opt == 0) {
-    escape_dq(opt);
-    strcat(mes, opt);
+  if (n_opt != 0) {
+    if (opts_len == 1) {
+      strcpy(mes, BaseMes);
+      escape_dq(opts[0]);
+      strcat(mes, opts[0]);
+    }
+    else {
+      strcpy(mes, ManyMes);
+    }
     commit_kit(mes);
   }
 }
