@@ -9,7 +9,7 @@
 #include <dirent.h>
 #include <termios.h>
 #include <unistd.h>
-const char KitVersion[] = "Kit 0.9.2 beta";
+const char KitVersion[] = "Kit 0.10.2 beta";
 const char GitDir[]     = ".git";
 const char KitFile[]    = ".kitstack";
 const char GitCmd[]    = "git ";
@@ -349,34 +349,46 @@ void cmd_list() {
   fclose(fp);
 }
 void cmd_remove(int argc, char * const argv[]) {
+  const char BaseMes[] = "[kit]remove plan ";
+  const char BaseMesMany[] = "[kit]remove plans";
   char buffer[128][128] = { {0} };
-  char mes[128] = "[kit]remove plan ";
-  int i, num, pointer, n_opt = 0;
+  char mes[128];
+  int i, num, targets[64], targ_len = 0, n_opt = 0;
   //-nオプションの検出
   if (getopt(argc, argv, "n") != -1) {
     n_opt = 1;
   }
   //引数で指定のない場合には先頭の予定を削除する
-  if ((optind < argc) && (atoi(argv[optind]) == 0)) {
-    pointer = atoi(argv[2]);
+  while (optind < argc) {
+    targets[targ_len] = atoi(argv[optind]);
+    targ_len++;
     optind++;
   }
-  else {
-    pointer = 0;
+  if (targ_len == 0) {
+    targets[0] = 0;
+    targ_len = 1;
   }
   //ファイルを開いて全部読む
   num = read_kit_file(128, buffer);
-  if (num <= pointer) {
-    printf("Not exist\n");
-    exit(1);
-  }
   //削除する予定の内容をコミットメッセージ用に保存
   if (n_opt == 0) {
-    escape_dq(buffer[pointer]);
-    strcat(mes, buffer[pointer]);
+    if (targ_len > 1) {
+      strcpy(mes, BaseMesMany);
+    }
+    else {
+      strcpy(mes, BaseMes);
+      escape_dq(buffer[targets[0]]);
+      strcat(mes, buffer[targets[0]]);
+    }
   }
   //ファイルを一旦リセットして指定の行以外を全部書き込む
-  buffer[pointer][0] = '\0';
+  for(i = 0; i < targ_len; i++) {
+    if (targets[i] >= num) {
+      printf("Not exist plan %d\n", targets[i]);
+      exit(1);
+    }
+    buffer[targets[i]][0] = '\0';
+  }
   save_kit_file(num, buffer);
   //kitファイルの変更をコミット
   if (n_opt == 0) { commit_kit(mes); }
