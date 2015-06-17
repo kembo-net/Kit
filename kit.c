@@ -9,7 +9,7 @@
 #include <dirent.h>
 #include <termios.h>
 #include <unistd.h>
-const char KitVersion[] = "Kit 0.10.2 beta";
+const char KitVersion[] = "Kit 0.11 beta";
 const char GitDir[]     = ".git";
 const char KitFile[]    = ".kitstack";
 const char GitCmd[]    = "git ";
@@ -351,18 +351,29 @@ void cmd_list() {
 void cmd_remove(int argc, char * const argv[]) {
   const char BaseMes[] = "[kit]remove plan ";
   const char BaseMesMany[] = "[kit]remove plans";
+  const char BaseMesAll[] = "[kit]remove plans all";
+  const char AllCmd[] = "all";
   char buffer[128][128] = { {0} };
   char mes[128];
-  int i, num, targets[64], targ_len = 0, n_opt = 0;
+  int i, num, targets[64], targ_len = 0, n_opt = 0, all_flg = 0;
   //-nオプションの検出
   if (getopt(argc, argv, "n") != -1) {
     n_opt = 1;
   }
   //引数で指定のない場合には先頭の予定を削除する
-  while (optind < argc) {
-    targets[targ_len] = atoi(argv[optind]);
-    targ_len++;
-    optind++;
+  if (optind < argc) {
+    if (strcmp(argv[optind], AllCmd) == 0) {
+      all_flg = 1;
+    }
+    else {
+      while (optind < argc) {
+        if (is_num(argv[optind]) == 0) {
+          targets[targ_len] = atoi(argv[optind]);
+          targ_len++;
+        }
+        optind++;
+      }
+    }
   }
   if (targ_len == 0) {
     targets[0] = 0;
@@ -372,7 +383,10 @@ void cmd_remove(int argc, char * const argv[]) {
   num = read_kit_file(128, buffer);
   //削除する予定の内容をコミットメッセージ用に保存
   if (n_opt == 0) {
-    if (targ_len > 1) {
+    if (all_flg) {
+      strcpy(mes, BaseMesAll);
+    }
+    else if (targ_len > 1) {
       strcpy(mes, BaseMesMany);
     }
     else {
@@ -382,14 +396,19 @@ void cmd_remove(int argc, char * const argv[]) {
     }
   }
   //ファイルを一旦リセットして指定の行以外を全部書き込む
-  for(i = 0; i < targ_len; i++) {
-    if (targets[i] >= num) {
-      printf("Not exist plan %d\n", targets[i]);
-      exit(1);
-    }
-    buffer[targets[i]][0] = '\0';
+  if (all_flg) {
+    save_kit_file(0, buffer);
   }
-  save_kit_file(num, buffer);
+  else {
+    for(i = 0; i < targ_len; i++) {
+      if (targets[i] >= num) {
+        printf("Not exist plan %d\n", targets[i]);
+        exit(1);
+      }
+      buffer[targets[i]][0] = '\0';
+    }
+    save_kit_file(num, buffer);
+  }
   //kitファイルの変更をコミット
   if (n_opt == 0) { commit_kit(mes); }
 }
