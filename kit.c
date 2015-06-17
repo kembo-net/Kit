@@ -9,7 +9,7 @@
 #include <dirent.h>
 #include <termios.h>
 #include <unistd.h>
-const char KitVersion[] = "Kit 0.11.1 beta";
+const char KitVersion[] = "Kit 0.11.2 beta";
 const char GitDir[]     = ".git";
 const char KitFile[]    = ".kitstack";
 const char GitCmd[]    = "git ";
@@ -115,9 +115,6 @@ void save_kit_file(int index, char inputs[][128]) {
     printf("kit file open error.\n");
     exit(1);
   }
-  strcpy(cmd_str, AddCmd);
-  strcat(cmd_str, KitFile);
-  system(cmd_str);
 }
 //引数の一覧を文字列にして詰め込む
 void gen_arg_str(int argc, char * const argv[], int start, char result[]) {
@@ -158,12 +155,17 @@ void escape_dq(char str[]) {
     }
   }
 }
-//kitの更新記録をコミットする
-void commit_kit(const char message[]) {
+//kitファイルをaddする
+void add_kit() {
   char cmd_str[128];
   strcpy(cmd_str, AddCmd);
   strcat(cmd_str, KitFile);
   system(cmd_str);
+}
+//kitの更新記録をコミットする
+void commit_kit(const char message[]) {
+  char cmd_str[128];
+  add_kit();
   strcpy(cmd_str, CommitCmd);
   strcat(cmd_str, "\"");
   strcat(cmd_str, message);
@@ -311,6 +313,7 @@ void cmd_done(int argc, char * const argv[]) {
   //ファイルを一旦リセットして指定の行以外を全部書き込む
   buffer[pointer][0] = '\0';
   save_kit_file(num, buffer);
+  add_kit();
   //コマンド実行
   system(cmd_str);
 }
